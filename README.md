@@ -1,32 +1,43 @@
-# AgentOS 課堂操作指南
+# AgentOS 超新手操作指南
 
-這份文件是給學生直接照著操作的 step-by-step 手冊。
+這份文件給第一次碰 Docker 和 AgentOS 的同學，照做就能把 baseline 跑起來。
 
-目標分成兩段：
+你要完成的目標：
 
-1. 先把 baseline 跑起來
-2. 再做一個自己的延伸版本
-
----
-
-## 1. 你會完成什麼
-
-完成後你應該可以：
-
-- 啟動 AgentOS 與資料庫
-- 載入知識庫內容
-- 用 `os.agno.com` 測試 agent
-- 分辨 `knowledge-agent` 和 `mcp-agent` 的差異
-- 選一個方向做延伸實作
+1. 本機 API 跑起來
+2. 在 os.agno.com 連上你的本機 AgentOS
+3. 看到 `knowledge-agent` 與 `mcp-agent`
 
 ---
 
-## 2. 進入專案資料夾
+## 0. 先準備好兩件事
 
-按照先前投影片安裝的話會有 `agentos-docker` 專案資料夾
-用指令進入該資料夾
+1. 已安裝 Docker Desktop
+2. 已安裝 Git（如果你要用 git clone）
 
-範例：
+如果你是第一堂課沒來，先去 Google AI Studio 申請 Gemini API Key：
+
+1. 打開 https://aistudio.google.com/
+2. 登入 Google 帳號
+3. 建立 API Key
+4. 複製 key，等等會放到 `.env`
+
+---
+
+## 1. 取得專案（兩種方式擇一）
+
+### 方式 A：git clone
+
+```bash
+git clone <你的repo網址>
+cd agentos-docker
+```
+
+### 方式 B：下載 zip
+
+1. 在 GitHub 按 `Code` -> `Download ZIP`
+2. 解壓縮
+3. 用 Terminal 進到解壓後的 `agentos-docker`
 
 ```bash
 cd agentos-docker
@@ -34,9 +45,10 @@ cd agentos-docker
 
 ---
 
-## 3. 設定 `.env`
+## 2. 設定 `.env`
 
-agentos-docker資料夾裡裡應該有.env檔案，請放入下面兩行
+在專案根目錄建立或修改 `.env`，至少有這兩行：
+
 ```env
 GOOGLE_API_KEY=你的_gemini_api_key
 AGNO_MODEL_ID=gemini-2.5-flash
@@ -44,38 +56,96 @@ AGNO_MODEL_ID=gemini-2.5-flash
 
 注意：
 
-- `GOOGLE_API_KEY=` 後面不要多空格
-- 不要寫成 `GOOGLE_API_KEY = ...`
-- 不要用舊模型 `gemini-2.0-flash`
+1. `=` 左右不要有空格
+2. 不要用舊模型 `gemini-2.0-flash`
 
 ---
 
-## 4. 啟動系統
-
-在專案資料夾中執行：
+## 3. 啟動系統
 
 ```bash
 docker compose up -d --build
 ```
 
-確認容器有起來：
+### 3.1 如果出現 Docker daemon 錯誤
+
+若你看到：
+
+```text
+Cannot connect to the Docker daemon ... Is the docker daemon running?
+```
+
+代表 Docker Desktop 還沒啟動。
+
+請做：
+
+1. 點兩下開啟 Docker Desktop App
+2. 等到 Docker 完全啟動（圖示顯示 running）
+3. 再重跑 `docker compose up -d --build`
+
+---
+
+## 4. 正確檢查容器狀態（不只看名稱）
 
 ```bash
 docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 ```
 
-預期至少看到：
+你應該至少看到：
 
-- `agentos-api`
-- `agentos-db`
+1. `agentos-db` 狀態是 `Up ...`
+2. `agentos-api` 狀態是 `Up ...`
 
-確認 API 正常：
+如果 `agentos-api` 是 `Restarting ...`，代表有錯，還沒成功。
+
+---
+
+## 5. 如果你看到 Restarting，不是等就好
+
+常見訊息：
+
+```text
+Container ... is restarting, wait until the container is running
+```
+
+這句話不是要你一直等，通常代表容器啟動就崩潰。
+
+請立刻看 log：
+
+```bash
+docker compose logs --no-color --tail=100 agentos-api
+```
+
+### 5.1 常見錯誤：entrypoint 權限不足
+
+如果你看到：
+
+```text
+exec /app/scripts/entrypoint.sh: permission denied
+```
+
+請執行：
+
+```bash
+chmod +x scripts/entrypoint.sh
+docker compose up -d --build --force-recreate --no-deps agentos-api
+```
+
+然後再檢查：
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+---
+
+## 6. 健康檢查 API
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-預期看到：
+預期看到類似：
 
 ```json
 {"status":"ok", ...}
@@ -83,101 +153,75 @@ curl http://127.0.0.1:8000/health
 
 ---
 
-## 5. 載入知識庫文件
-
-第一次使用要先把文件灌進知識庫：
+## 7. 載入知識庫（第一次必做）
 
 ```bash
 docker exec -it agentos-api python -m agents.knowledge_agent
 ```
 
-如果成功，會看到類似：
+成功會看到類似：
 
 ```text
 INFO Adding content from URL ...
 INFO Upserted batch of 1 documents.
 ```
 
-如果這步沒有成功，後面 `knowledge-agent` 可能不會正常回答。
-
 ---
 
-## 6. 使用 AgentOS UI
+## 8. 連到 os.agno.com（重點）
 
-正常情況下，課堂主要使用 [https://os.agno.com](https://os.agno.com)。
+課堂使用的是雲端介面，不是 localhost 畫面。
 
-請先確認本地 API 已啟動，然後進行連線。
-
-### 6.1 打開 AgentOS UI
-
-在瀏覽器打開：
-
-```text
-https://os.agno.com
-```
-
-### 6.2 連接本地 AgentOS
-
-依序操作：
-
-1. 登入 `os.agno.com`
-2. 點選新增 OS
-3. 選擇 `Local`
-4. 輸入：
+1. 打開 https://os.agno.com
+2. 登入後選 `Connect your AgentOS`
+3. 自己幫這個連線取一個名字（例如 `my-local-agentos`）
+4. URL 輸入：
 
 ```text
 http://localhost:8000
 ```
 
-5. 完成連線
+連線成功後，你會在 os.agno.com 看到：
 
-如果連線成功，你應該可以看到目前的 agent，例如：
+1. `knowledge-agent`
+2. `mcp-agent`
 
-- `knowledge-agent`
-- `mcp-agent`
+這兩個 agent 是在 os.agno.com 裡面看，不是在 `http://localhost:8000` 頁面看。
 
 ---
 
-## 7. Baseline 測試
+## 9. Baseline 測試
 
 先不要改任何程式，先確認 baseline 可跑。
 
-### 7.1 測試 `knowledge-agent`
+### 9.1 測試 knowledge-agent
 
-在 AgentOS UI 中：
+在 AgentOS UI 中操作：
 
-- 選 `knowledge-agent`
-- 輸入：
-
-```text
-What is Agno?
-```
+1. 選 `knowledge-agent`
+2. 輸入：`What is Agno?`
 
 預期：
 
-- 會得到一段關於 Agno 的介紹
-- 會提到 `Framework`、`Runtime`、`Control Plane`
-- 會顯示來源或相關依據
+1. 會得到一段關於 Agno 的介紹
+2. 會提到 `Framework`、`Runtime`、`Control Plane`
+3. 會顯示來源或相關依據
 
-### 7.2 測試 `mcp-agent`
+### 9.2 測試 mcp-agent
 
-在 AgentOS UI 中：
+在 AgentOS UI 中操作：
 
-- 選 `mcp-agent`
-- 輸入：
-
-```text
-What tools do you have access to?
-```
+1. 選 `mcp-agent`
+2. 輸入：`What tools do you have access to?`
 
 預期：
 
-- 會說明可用工具
-- 回答風格和 `knowledge-agent` 不同
+1. 會說明可用工具
+2. 回答風格和 `knowledge-agent` 不同
 
 ---
 
-## 8. 備援方案：Gradio UI
+## 10. 備援方案：Gradio UI
 
 如果 `os.agno.com` 無法正常連線，再使用這個備援方案。
 
@@ -201,178 +245,138 @@ http://localhost:7860
 
 ---
 
-## 9. 兩個 agent 的差異
+## 11. 兩個 agent 的差異
 
-### `knowledge-agent`
-
-用途：
-
-- 查已載入的知識庫內容
-
-適合問題：
-
-- `What is Agno?`
-- `How do I create my first agent?`
-- `What documents are in your knowledge base?`
-
-### `mcp-agent`
+### knowledge-agent
 
 用途：
 
-- 用 MCP tool 查 Agno 文件
+1. 查已載入的知識庫內容
 
 適合問題：
 
-- `What tools do you have access to?`
-- `Find examples of agents with memory.`
-- `Search the docs for how to use LearningMachine.`
+1. `What is Agno?`
+2. `How do I create my first agent?`
+3. `What documents are in your knowledge base?`
+
+### mcp-agent
+
+用途：
+
+1. 用 MCP tool 查 Agno 文件
+
+適合問題：
+
+1. `What tools do you have access to?`
+2. `Find examples of agents with memory.`
+3. `Search the docs for how to use LearningMachine.`
 
 ---
 
-## 10. Baseline 完成標準
+## 12. Baseline 完成標準
 
 至少要做到：
 
-- 成功啟動 `agentos-api`
-- 成功載入知識庫文件
-- 成功問 `knowledge-agent`
-- 成功問 `mcp-agent`
+1. 成功啟動 `agentos-api`
+2. 成功載入知識庫文件
+3. 成功問 `knowledge-agent`
+4. 成功問 `mcp-agent`
 
 完成這些後，才進入延伸實作。
 
+---
 
-## 11. 如果 `os.agno.com` 連不上
+## 13. 常見訊息對照表
 
-先檢查 API：
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-如果 API 正常，但 `os.agno.com` 還是連不上，改用備援方案：
-
-```bash
-python ui/app.py
-```
-
-然後打開：
+### 訊息 A
 
 ```text
-http://localhost:7860
+The "OPENAI_API_KEY" variable is not set. Defaulting to a blank string.
+```
+
+通常可先忽略（本課程主要用 `GOOGLE_API_KEY`）。
+
+### 訊息 B
+
+```text
+Cannot connect to the Docker daemon ...
+```
+
+Docker Desktop 沒啟動，請先開 app。
+
+### 訊息 C
+
+```text
+exec /app/scripts/entrypoint.sh: permission denied
+```
+
+請執行 `chmod +x scripts/entrypoint.sh` 後重建容器(docker compose down  -> docker compose up)。
+
+---
+
+## 14. 真的卡住時，先做這 6 步
+
+1. `docker ps` 檢查 `agentos-api` 是否 `Up`（不是 `Restarting`）
+2. `docker compose logs --tail=100 agentos-api` 看最後錯誤
+3. `curl http://127.0.0.1:8000/health` 看 API 是否回應
+4. `docker exec agentos-api printenv GOOGLE_API_KEY` 看 key 是否有讀進去
+5. 確認 `.env` 用的是 `AGNO_MODEL_ID=gemini-2.5-flash`
+6. 重新建立 API 容器：`docker compose up -d --build --force-recreate --no-deps agentos-api`
+
+---
+
+## 15. 延伸實作方向（baseline 過了再做）
+
+1. 改 prompt 角色（助教、摘要、一定附來源）
+2. 新增自己的 agent（course-agent、faq-agent）
+3. 換知識庫成課程講義或專題文件
+4. 幫 agent 加新工具
+5. 改 UI（例如 Gradio）
+
+---
+
+## 16. 官方文件與範例（推薦）
+
+如果你想自己升級 agent，先看官方文件與範例：
+
+1. Agno GitHub 原始碼：https://github.com/agno-agi/agno/tree/main
+2. Agno 官方文件：https://docs.agno.com/introduction
+3. Tools Cookbook（可直接抄範例改）：https://github.com/agno-agi/agno/tree/main/cookbook/91_tools
+
+---
+
+## 17. 最簡單升級：在 agents 加 tools
+
+最小改動通常只要兩步：
+
+1. 在檔案開頭新增 import
+2. 在 `Agent(...)` 裡新增工具到 `tools=[...]`
+
+範例概念：
+
+```python
+from agno.tools.youtube import YouTubeTools
+
+agent = Agent(
+	tools=[
+		# 你原本的工具...
+		YouTubeTools(),
+	],
+)
+```
+
+你也可以加上描述讓 UI 更清楚：
+
+```python
+description="You are able to do youtube analysis"
 ```
 
 ---
 
-## 12. Gemini API key 常見問題
+## 18. YouTube Tool 參考範例
 
-這部分是最常見的卡點。
+官方範例位置：
 
-### 問題 1：模型設成舊版
+1. https://github.com/agno-agi/agno/blob/main/cookbook/91_tools/youtube_tools.py
 
-請確認 `.env` 使用的是：
-
-```env
-AGNO_MODEL_ID=gemini-2.5-flash
-```
-
-不要使用：
-
-```env
-AGNO_MODEL_ID=gemini-2.0-flash
-```
-
-### 問題 2：改了 `.env` 但容器沒更新
-
-如果你改過 `.env`，請重新啟動：
-
-```bash
-docker compose down
-docker compose up -d --build
-```
-
-### 問題 3：API key 沒讀進容器
-
-檢查容器內的 key：
-
-```bash
-docker exec agentos-api printenv GOOGLE_API_KEY
-```
-
-如果是空的，代表 `.env` 沒有正確讀進去。
-
-### 問題 4：配額錯誤
-
-如果看到：
-
-- `429 RESOURCE_EXHAUSTED`
-- `limit: 0`
-
-代表目前這把 key 對應的專案沒有可用 quota，或不是你以為那把 key。
-
-### 問題 5：快速重測
-
-如果 UI 有問題，也可以直接用 API 測：
-
-```bash
-curl -X POST "http://127.0.0.1:8000/agents/knowledge-agent/runs" \
-  -F 'message=What is Agno?' \
-  -F 'stream=false'
-```
-
-
-## 13. 延伸實作方向
-
-可以選一個方向嘗試實作。
-
-### 方向 A：改 Prompt / 角色
-
-可以做：
-
-- 助教 agent
-- 新手教學 agent
-- 條列摘要 agent
-- 一定附來源的 agent
-
-### 方向 B：新增 Agent
-
-可以做：
-
-- `course-agent`
-- `lab-agent`
-- `faq-agent`
-- `coding-agent`
-
-### 方向 C：換知識庫內容
-
-把 Agno docs 換成自己的資料：
-
-- 課程講義
-- 實驗室規範
-- 作業說明
-- 專題文件
-
-### 方向 D：加 Tool
-
-幫 agent 增加新的能力：
-
-- 查網站
-- 查資料
-- 呼叫自訂 function
-
-### 方向 E：改 UI
-
-可以改：
-
-- 顯示更多欄位
-- 調整版面
-- 增加範例問題
-- 做成更像聊天視窗
-
-
-## 14. 如果卡住，先檢查這 5 件事
-
-1. `docker ps` 有沒有看到 `agentos-api`
-2. `curl http://127.0.0.1:8000/health` 有沒有回 `ok`
-3. `.env` 有沒有 `GOOGLE_API_KEY`
-4. `.env` 是不是 `AGNO_MODEL_ID=gemini-2.5-flash`
-5. `docker exec agentos-api printenv GOOGLE_API_KEY` 有沒有值
+你可以先照著範例理解，再把 `YouTubeTools()` 加回自己的 agent。

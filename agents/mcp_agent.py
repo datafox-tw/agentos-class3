@@ -13,6 +13,7 @@ from os import getenv
 from agno.agent import Agent
 from agno.models.google import Gemini
 from agno.tools.mcp import MCPTools
+from agno.tools.youtube import YouTubeTools
 
 from db import get_postgres_db
 
@@ -48,9 +49,12 @@ You are a helpful assistant with access to external tools via MCP (Model Context
 mcp_agent = Agent(
     id="mcp-agent",
     name="MCP Agent",
+    description="You are able to use MCP tools to answer user questions.",
     model=Gemini(id=getenv("AGNO_MODEL_ID", "gemini-2.0-flash")),
     db=agent_db,
-    tools=[MCPTools(url="https://docs.agno.com/mcp")],
+    tools=[
+        MCPTools(url="https://docs.agno.com/mcp"),
+    ],
     instructions=instructions,
     enable_agentic_memory=True,
     add_datetime_to_context=True,
